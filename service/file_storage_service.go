@@ -1,6 +1,7 @@
 package service
 
 import (
+	"awesomeProject/utils"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -12,28 +13,25 @@ import (
 )
 
 type FileUploader struct {
-	targetDir    string
-	allowedExits []string
+	TargetDir    string
+	AllowedExits []string
 }
 
-func NewFileUploader(targetDir string, allowedExits []string) *FileUploader {
-	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
-		err := os.MkdirAll(targetDir, 0777)
-		if err != nil {
-			return nil
-		}
-	}
-	return &FileUploader{targetDir: targetDir, allowedExits: allowedExits}
-}
+var targetDir = utils.GoDotEnvVariable("FILE_UPLOAD_PATH")
 
-func (fu *FileUploader) UploadFile(fileHeader *multipart.FileHeader) (string, error) {
+func UploadFile(fileHeader *multipart.FileHeader) (string, error) {
 	if fileHeader.Size == 0 {
 		return "", fmt.Errorf("file is required")
 	}
 
+	fu := FileUploader{
+		TargetDir:    targetDir,
+		AllowedExits: []string{".jpg", ".jpeg", ".png", ".pdf", ".docx"},
+	}
+
 	ext := strings.ToLower(filepath.Ext(fileHeader.Filename))
 	allowed := false
-	for _, allowedExt := range fu.allowedExits {
+	for _, allowedExt := range fu.AllowedExits {
 		if ext == allowedExt {
 			allowed = true
 			break
@@ -44,7 +42,7 @@ func (fu *FileUploader) UploadFile(fileHeader *multipart.FileHeader) (string, er
 	}
 
 	fileName := fmt.Sprintf("%s_%s", uuid.New().String(), filepath.Base(fileHeader.Filename))
-	targetFilePath := filepath.Join(fu.targetDir, fileName)
+	targetFilePath := filepath.Join(fu.TargetDir, fileName)
 
 	srcFile, err := fileHeader.Open()
 	if err != nil {

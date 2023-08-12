@@ -9,6 +9,8 @@ import (
 )
 
 func main() {
+
+	// Fiber instance
 	app := fiber.New()
 	app.Use(middleware.LogRequests)
 
