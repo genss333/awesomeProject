@@ -4,18 +4,84 @@ import (
 	"awesomeProject/json"
 	"awesomeProject/models"
 	"awesomeProject/utils"
+	"errors"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v4"
+	"log"
 	"strings"
 	"time"
 )
 
-type JWTService struct {
-	SecretKey []byte
-}
+var secretKey = []byte(utils.GoDotEnvVariable("JWT_SECRET_KEY"))
 
-var secretKey = JWTService{
-	SecretKey: []byte("8Zz5tw0Ion3XPZZfN0NOml3z9FMultiwordR9fp6ryDIoGRM8STEPHA6iHsc0fb"),
+var activeTokens = make(map[string]int64)
+
+func JWTMiddleware(c *fiber.Ctx) error {
+	authorizationHeader := c.Get("Authorization")
+	if authorizationHeader == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Missing authorization header",
+			"status":  fiber.StatusUnauthorized,
+			"path":    c.Path(),
+		})
+	}
+
+	if !strings.HasPrefix(authorizationHeader, "Bearer ") {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Invalid token format",
+			"status":  fiber.StatusUnauthorized,
+			"path":    c.Path(),
+		})
+	}
+
+	tokenString := strings.TrimPrefix(authorizationHeader, "Bearer ")
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		return secretKey, nil
+	})
+
+	if err != nil {
+		if errors.Is(err, jwt.ErrSignatureInvalid) {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"message": "Invalid token signature",
+				"status":  fiber.StatusUnauthorized,
+				"path":    c.Path(),
+			})
+		}
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Invalid token",
+			"status":  fiber.StatusUnauthorized,
+			"path":    c.Path(),
+		})
+	}
+
+	if token.Valid {
+		tokenExp := int64(token.Claims.(jwt.MapClaims)["exp"].(float64))
+
+		if _, exists := activeTokens[tokenString]; !exists {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"message": "Token is no longer active",
+				"status":  fiber.StatusUnauthorized,
+				"path":    c.Path(),
+			})
+		}
+
+		currentTime := time.Now().Unix()
+		if currentTime > tokenExp {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"message": "Token has expired",
+				"status":  fiber.StatusUnauthorized,
+				"path":    c.Path(),
+			})
+		}
+
+		return c.Next()
+	}
+
+	return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+		"message": "Invalid token",
+		"status":  fiber.StatusUnauthorized,
+		"path":    c.Path(),
+	})
 }
 
 func GenerateToken(user models.User) (json.AuthJson, error) {
@@ -23,9 +89,9 @@ func GenerateToken(user models.User) (json.AuthJson, error) {
 	claims := token.Claims.(jwt.MapClaims)
 	claims["user_id"] = user.UserId
 	claims["username"] = user.Username
-	claims["exp"] = time.Now().Add(time.Hour * 24).Unix()
+	claims["exp"] = time.Now().Add(time.Second * 5000).Unix()
 
-	tokenString, err := token.SignedString(secretKey.SecretKey)
+	tokenString, err := token.SignedString(secretKey)
 	if err != nil {
 		return json.AuthJson{}, err
 	}
@@ -36,12 +102,14 @@ func GenerateToken(user models.User) (json.AuthJson, error) {
 		TokenExp: claims["exp"].(int64),
 	}
 
+	activeTokens[tokenString] = auth.TokenExp
+
 	return auth, nil
 }
 
 func GetCurrentUserFromToken(tokenString string) (json.AuthTokenJson, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		return secretKey.SecretKey, nil
+		return secretKey, nil
 	})
 
 	if err != nil || !token.Valid {
@@ -59,7 +127,7 @@ func GetCurrentUserFromToken(tokenString string) (json.AuthTokenJson, error) {
 	return authJson, nil
 }
 
-func CurrentUser(c *fiber.Ctx) error {
+func CurrentUser(c *fiber.Ctx) (json.AuthTokenJson, error) {
 	var token = c.Get("Authorization")
 	if strings.HasPrefix(token, "Bearer ") {
 		token = strings.TrimPrefix(token, "Bearer ")
@@ -67,8 +135,27 @@ func CurrentUser(c *fiber.Ctx) error {
 	authJson, err := GetCurrentUserFromToken(token)
 	if err != nil {
 		utils.RespondWithError(c, fiber.StatusBadRequest, "Invalid token")
-		return err
+		return json.AuthTokenJson{}, err
 	}
 
-	return c.JSON(authJson)
+	return authJson, nil
+}
+
+func Logout(c *fiber.Ctx) error {
+	token := c.Get("Authorization")
+	if strings.HasPrefix(token, "Bearer ") {
+		token = strings.TrimPrefix(token, "Bearer ")
+	}
+
+	RevokeToken(token)
+	return c.SendStatus(fiber.StatusOK)
+}
+
+func RevokeToken(token string) {
+	delete(activeTokens, token)
+}
+
+func LogRequests(c *fiber.Ctx) error {
+	log.Println(c.Method(), c.Path())
+	return c.Next()
 }

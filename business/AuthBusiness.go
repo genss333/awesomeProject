@@ -64,3 +64,12 @@ func Login(c *fiber.Ctx) error {
 	return c.JSON(token)
 
 }
+
+func Logout(c *fiber.Ctx) error {
+	err := service.Logout(c)
+	if err != nil {
+		return err
+	}
+	return utils.RespondWithSuccess(c, fiber.StatusOK, "Logout success")
+
+}
