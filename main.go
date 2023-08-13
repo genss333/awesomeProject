@@ -2,7 +2,7 @@ package main
 
 import (
 	"awesomeProject/controller"
-	"awesomeProject/middleware"
+	"awesomeProject/service"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"log"
@@ -12,13 +12,13 @@ func main() {
 
 	// Fiber instance
 	app := fiber.New()
-	app.Use(middleware.LogRequests)
+	app.Use(service.LogRequests)
 
 	// Auth controller routes
 	controller.AuthInitializeRoutes(app)
 
 	// Middleware to protect routes with JWT
-	app.Use(middleware.JWTMiddleware)
+	app.Use(service.JWTMiddleware)
 
 	// User controller routes
 	controller.UserInitializeRoutes(app)

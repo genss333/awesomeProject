@@ -6,9 +6,10 @@ import (
 )
 
 func UserInitializeRoutes(app *fiber.App) {
-	app.Get("/api/users", getUsersHandler)
-	app.Get("/api/users/:id", getUserByIdHandler)
-	app.Post("/api/users", createUserHandler)
+	app.Get("/api/user/", getUsersHandler)
+	app.Get("/api/user/:id", getUserByIdHandler)
+	app.Post("/api/user/", createUserHandler)
+	app.Post("/api/user/logout", logoutHandler)
 }
 
 func getUsersHandler(c *fiber.Ctx) error {
@@ -21,4 +22,8 @@ func getUserByIdHandler(c *fiber.Ctx) error {
 
 func createUserHandler(c *fiber.Ctx) error {
 	return business.CreateUser(c)
+}
+
+func logoutHandler(c *fiber.Ctx) error {
+	return business.Logout(c)
 }
