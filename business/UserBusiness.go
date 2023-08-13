@@ -126,3 +126,66 @@ func CreateUser(c *fiber.Ctx) error {
 
 	return utils.RespondWithSuccess(c, fiber.StatusCreated, "User created successfully")
 }
+
+func UpdateUser(c *fiber.Ctx) error {
+	authJson, err := service.CurrentUser(c)
+	if err != nil {
+		return err
+	}
+
+	form, err := c.MultipartForm()
+	if err != nil {
+		return err
+	}
+
+	username := form.Value["username"][0]
+	userEmail := form.Value["email"][0]
+	address := form.Value["address"][0]
+	tel := form.Value["tel"][0]
+	pId := form.Value["pid"][0]
+	image, err := c.FormFile("image")
+	file, err := service.UploadFile(image)
+	if err != nil {
+		return err
+	}
+
+	payload := CreateUserPayload.CreateUserPayload{
+		Username:  username,
+		UserEmail: userEmail,
+		Address:   address,
+		Tel:       tel,
+		PId:       pId,
+		Image:     file,
+	}
+
+	dataUsers := map[string]interface{}{
+		"username":   payload.Username,
+		"user_email": payload.UserEmail,
+	}
+
+	errUser := database.Update("Users", dataUsers, map[string]interface{}{"user_id": authJson.UserId})
+	if errUser != nil {
+		utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to update user data")
+		return errUser
+	}
+
+	errBook := database.Update("Book", map[string]interface{}{
+		"address": payload.Address,
+		"tel":     payload.Tel,
+		"pid":     payload.PId,
+	}, map[string]interface{}{"user_id": authJson.UserId})
+	if errBook != nil {
+		utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to update book data")
+		return errBook
+	}
+
+	errImage := database.Update("User_Image", map[string]interface{}{
+		"image": payload.Image,
+	}, map[string]interface{}{"user_id": authJson.UserId})
+	if errImage != nil {
+		utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to update image data")
+		return errImage
+	}
+
+	return utils.RespondWithSuccess(c, fiber.StatusNoContent, "User updated successfully")
+}

@@ -127,7 +127,7 @@ func GetCurrentUserFromToken(tokenString string) (json.AuthTokenJson, error) {
 	return authJson, nil
 }
 
-func CurrentUser(c *fiber.Ctx) error {
+func CurrentUser(c *fiber.Ctx) (json.AuthTokenJson, error) {
 	var token = c.Get("Authorization")
 	if strings.HasPrefix(token, "Bearer ") {
 		token = strings.TrimPrefix(token, "Bearer ")
@@ -135,10 +135,10 @@ func CurrentUser(c *fiber.Ctx) error {
 	authJson, err := GetCurrentUserFromToken(token)
 	if err != nil {
 		utils.RespondWithError(c, fiber.StatusBadRequest, "Invalid token")
-		return err
+		return json.AuthTokenJson{}, err
 	}
 
-	return c.JSON(authJson)
+	return authJson, nil
 }
 
 func Logout(c *fiber.Ctx) error {

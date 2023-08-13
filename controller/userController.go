@@ -2,13 +2,14 @@ package controller
 
 import (
 	"awesomeProject/business"
-	fiber "github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2"
 )
 
 func UserInitializeRoutes(app *fiber.App) {
 	app.Get("/api/user/", getUsersHandler)
 	app.Get("/api/user/:id", getUserByIdHandler)
 	app.Post("/api/user/", createUserHandler)
+	app.Patch("/api/user/update", updateUserHandler)
 	app.Post("/api/user/logout", logoutHandler)
 }
 
@@ -22,6 +23,10 @@ func getUserByIdHandler(c *fiber.Ctx) error {
 
 func createUserHandler(c *fiber.Ctx) error {
 	return business.CreateUser(c)
+}
+
+func updateUserHandler(c *fiber.Ctx) error {
+	return business.UpdateUser(c)
 }
 
 func logoutHandler(c *fiber.Ctx) error {
