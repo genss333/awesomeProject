@@ -89,7 +89,7 @@ func GenerateToken(user models.User) (json.AuthJson, error) {
 	claims := token.Claims.(jwt.MapClaims)
 	claims["user_id"] = user.UserId
 	claims["username"] = user.Username
-	claims["exp"] = time.Now().Add(time.Second * 5000).Unix()
+	claims["exp"] = time.Now().Add(time.Hour * 3).Unix()
 
 	tokenString, err := token.SignedString(secretKey)
 	if err != nil {
