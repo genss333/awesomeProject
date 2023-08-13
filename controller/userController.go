@@ -10,6 +10,7 @@ func UserInitializeRoutes(app *fiber.App) {
 	app.Get("/api/user/:id", getUserByIdHandler)
 	app.Post("/api/user/", createUserHandler)
 	app.Patch("/api/user/update", updateUserHandler)
+	app.Delete("/api/user/delete/:id", deleteUserHandler)
 	app.Post("/api/user/logout", logoutHandler)
 }
 
@@ -27,6 +28,10 @@ func createUserHandler(c *fiber.Ctx) error {
 
 func updateUserHandler(c *fiber.Ctx) error {
 	return business.UpdateUser(c)
+}
+
+func deleteUserHandler(c *fiber.Ctx) error {
+	return business.DeleteUser(c)
 }
 
 func logoutHandler(c *fiber.Ctx) error {

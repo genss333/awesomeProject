@@ -189,3 +189,27 @@ func UpdateUser(c *fiber.Ctx) error {
 
 	return utils.RespondWithSuccess(c, fiber.StatusNoContent, "User updated successfully")
 }
+
+func DeleteUser(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	err := database.Delete("Users", map[string]interface{}{"user_id": id})
+	if err != nil {
+		utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to delete user data")
+		return err
+	}
+
+	errBook := database.Delete("Book", map[string]interface{}{"user_id": id})
+	if errBook != nil {
+		utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to delete book data")
+		return errBook
+	}
+
+	errImage := database.Delete("User_Image", map[string]interface{}{"user_id": id})
+	if errImage != nil {
+		utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to delete image data")
+		return errImage
+	}
+
+	return utils.RespondWithSuccess(c, fiber.StatusNoContent, "User deleted successfully")
+}
