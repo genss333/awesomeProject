@@ -144,6 +144,19 @@ func UpdateUser(c *fiber.Ctx) error {
 		return err
 	}
 
+	if address == "" {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Address is required")
+	}
+	if tel == "" {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Tel is required")
+	}
+	if pId == "" {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Pid is required")
+	}
+	if image == nil {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Image is required")
+	}
+
 	tx := db.Begin()
 
 	tx.Model(&models.Book{}).Where("user_id = ?", authJson.UserId).
