@@ -180,6 +180,11 @@ func DeleteUser(c *fiber.Ctx) error {
 
 	tx := db.Begin()
 
+	tx.Find(&models.User{}, "user_id = ?", id)
+	fmt.Println(tx.RowsAffected)
+	if tx.RowsAffected == 0 {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "User not found")
+	}
 	tx.Delete(&models.User{}, id)
 
 	tx.Commit()
