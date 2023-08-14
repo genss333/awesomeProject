@@ -57,7 +57,7 @@ func Login(c *fiber.Ctx) error {
 func Logout(c *fiber.Ctx) error {
 	err := service.Logout(c)
 	if err != nil {
-		return err
+		return utils.RespondJson(c, fiber.StatusOK, "Logout failed")
 	}
 	return utils.RespondJson(c, fiber.StatusOK, "Logout success")
 
