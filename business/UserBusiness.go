@@ -3,58 +3,44 @@ package business
 import (
 	"awesomeProject/database"
 	"awesomeProject/models"
-	CreateUserPayload "awesomeProject/payload"
 	"awesomeProject/service"
 	"awesomeProject/utils"
+	"fmt"
 	"github.com/gofiber/fiber/v2"
 )
 
 func GetUsers(c *fiber.Ctx) error {
-	rows, err := database.Select("Users", nil)
-
+	db, err := database.Connect()
 	if err != nil {
-		utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to connect to the database")
 		return err
 	}
 
 	var users []models.User
-	for rows.Next() {
-		var user models.User
-		err := rows.Scan(&user.UserId, &user.Username, &user.UserEmail, &user.UserStatus)
-		if err != nil {
-			utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to read user data")
-			return err
-		}
-		users = append(users, user)
-	}
+	db.Preload("Books").Preload("UserImages").Find(&users)
+	fmt.Println(users)
 
 	return c.JSON(users)
 }
 
 func GetUserById(c *fiber.Ctx) error {
 	id := c.Params("id")
-
-	row, err := database.Select("Users", map[string]interface{}{"user_id": id})
+	db, err := database.Connect()
 	if err != nil {
-		utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to connect to the database")
 		return err
 	}
+
 	var user models.User
-	if row.Next() {
-		err := row.Scan(&user.UserId, &user.Username, &user.UserEmail, &user.UserStatus)
-		if err != nil {
-			utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to read user data")
-			return err
-		}
-	} else {
-		utils.RespondWithError(c, fiber.StatusBadRequest, "User not found")
-		return nil
-	}
+	db.Preload("Books").Preload("UserImages").Find(&user, id)
 
 	return c.JSON(user)
 }
 
 func CreateUser(c *fiber.Ctx) error {
+	db, err := database.Connect()
+	if err != nil {
+		return err
+	}
+
 	form, err := c.MultipartForm()
 	if err != nil {
 		return err
@@ -62,72 +48,84 @@ func CreateUser(c *fiber.Ctx) error {
 
 	username := form.Value["username"][0]
 	userEmail := form.Value["email"][0]
+	password := form.Value["password"][0]
 	address := form.Value["address"][0]
 	tel := form.Value["tel"][0]
 	pId := form.Value["pid"][0]
 	image, err := c.FormFile("image")
-	file, err := service.UploadFile(image)
 	if err != nil {
 		return err
 	}
 
-	payload := CreateUserPayload.CreateUserPayload{
+	if username == "" {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Username is required")
+	}
+	if userEmail == "" {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Email is required")
+	}
+	if password == "" {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Password is required")
+	}
+	if address == "" {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Address is required")
+	}
+	if tel == "" {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Tel is required")
+	}
+	if pId == "" {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Pid is required")
+	}
+	if image == nil {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Image is required")
+	}
+
+	checkIsUser, err := CheckAlreadyUser(username)
+	if err != nil {
+		return utils.RespondJson(c, fiber.StatusBadRequest, err.Error())
+	}
+	if checkIsUser.Username == username {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "User already exists")
+	}
+
+	tx := db.Begin()
+
+	dataUser := models.User{
 		Username:  username,
 		UserEmail: userEmail,
-		Address:   address,
-		Tel:       tel,
-		PId:       pId,
-		Image:     file,
+		Password:  utils.EnSha256Hash(password),
 	}
+	tx.Create(&dataUser)
 
-	dataUsers := map[string]interface{}{
-		"username":   payload.Username,
-		"user_email": payload.UserEmail,
+	dataBook := models.Book{
+		Address: address,
+		Tel:     tel,
+		PId:     pId,
+		UserID:  dataUser.UserId,
 	}
+	tx.Create(&dataBook)
 
-	errUser := database.Insert("Users", dataUsers)
-	if errUser != nil {
-		utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to insert user data")
-		return errUser
-	}
-
-	userIdRow, err := database.CustomQuery("SELECT user_id FROM Users ORDER BY user_id DESC LIMIT 1")
+	file, err := service.UploadFile(image)
 	if err != nil {
-		utils.RespondWithError(c, fiber.StatusInternalServerError, string(err.Error()))
+		tx.Rollback()
 		return err
 	}
-	var userId string
-	if userIdRow.Next() {
-		err := userIdRow.Scan(&userId)
-		if err != nil {
-			utils.RespondWithError(c, fiber.StatusInternalServerError, string(err.Error()))
-			return err
-		}
+	dataUserImage := models.UserImage{
+		Image:  file,
+		UserID: dataUser.UserId,
 	}
+	tx.Create(&dataUserImage)
 
-	errBook := database.Insert("Book", map[string]interface{}{
-		"address": payload.Address,
-		"tel":     payload.Tel,
-		"pid":     payload.PId,
-	})
-	if errBook != nil {
-		utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to insert book data")
-		return errBook
-	}
+	tx.Commit()
 
-	errImage := database.Insert("User_Image", map[string]interface{}{
-		"image":   payload.Image,
-		"user_id": userId,
-	})
-	if errImage != nil {
-		utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to insert image data")
-		return errImage
-	}
-
-	return utils.RespondWithSuccess(c, fiber.StatusCreated, "User created successfully")
+	return utils.RespondJson(c, fiber.StatusCreated, "User created successfully")
 }
 
 func UpdateUser(c *fiber.Ctx) error {
+	db, err := database.Connect()
+	if err != nil {
+		return err
+	}
+
 	authJson, err := service.CurrentUser(c)
 	if err != nil {
 		return err
@@ -138,78 +136,84 @@ func UpdateUser(c *fiber.Ctx) error {
 		return err
 	}
 
-	username := form.Value["username"][0]
-	userEmail := form.Value["email"][0]
 	address := form.Value["address"][0]
 	tel := form.Value["tel"][0]
 	pId := form.Value["pid"][0]
 	image, err := c.FormFile("image")
-	file, err := service.UploadFile(image)
 	if err != nil {
 		return err
 	}
 
-	payload := CreateUserPayload.CreateUserPayload{
-		Username:  username,
-		UserEmail: userEmail,
-		Address:   address,
-		Tel:       tel,
-		PId:       pId,
-		Image:     file,
+	if address == "" {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Address is required")
+	}
+	if tel == "" {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Tel is required")
+	}
+	if pId == "" {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Pid is required")
+	}
+	if image == nil {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Image is required")
 	}
 
-	dataUsers := map[string]interface{}{
-		"username":   payload.Username,
-		"user_email": payload.UserEmail,
+	tx := db.Begin()
+
+	tx.Model(&models.Book{}).Where("user_id = ?", authJson.UserId).
+		Updates(models.Book{
+			Address: address,
+			Tel:     tel,
+			PId:     pId,
+		})
+
+	if image != nil {
+		file, err := service.UploadFile(image)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		tx.Model(&models.UserImage{}).Where("user_id = ?", authJson.UserId).
+			Updates(models.UserImage{
+				Image: file,
+			})
 	}
 
-	errUser := database.Update("Users", dataUsers, map[string]interface{}{"user_id": authJson.UserId})
-	if errUser != nil {
-		utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to update user data")
-		return errUser
-	}
+	tx.Commit()
 
-	errBook := database.Update("Book", map[string]interface{}{
-		"address": payload.Address,
-		"tel":     payload.Tel,
-		"pid":     payload.PId,
-	}, map[string]interface{}{"user_id": authJson.UserId})
-	if errBook != nil {
-		utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to update book data")
-		return errBook
-	}
-
-	errImage := database.Update("User_Image", map[string]interface{}{
-		"image": payload.Image,
-	}, map[string]interface{}{"user_id": authJson.UserId})
-	if errImage != nil {
-		utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to update image data")
-		return errImage
-	}
-
-	return utils.RespondWithSuccess(c, fiber.StatusNoContent, "User updated successfully")
+	return utils.RespondJson(c, fiber.StatusNoContent, "User updated successfully")
 }
 
 func DeleteUser(c *fiber.Ctx) error {
-	id := c.Params("id")
-
-	err := database.Delete("Users", map[string]interface{}{"user_id": id})
+	db, err := database.Connect()
 	if err != nil {
-		utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to delete user data")
 		return err
 	}
 
-	errBook := database.Delete("Book", map[string]interface{}{"user_id": id})
-	if errBook != nil {
-		utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to delete book data")
-		return errBook
+	id := c.Params("id")
+
+	tx := db.Begin()
+
+	tx.Find(&models.User{}, "user_id = ?", id)
+	fmt.Println(tx.RowsAffected)
+	if tx.RowsAffected == 0 {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "User not found")
+	}
+	tx.Delete(&models.User{}, id)
+
+	tx.Commit()
+
+	return utils.RespondJson(c, fiber.StatusNoContent, "User deleted successfully")
+}
+
+func CheckAlreadyUser(username string) (models.User, error) {
+	db, err := database.Connect()
+	if err != nil {
+		return models.User{}, err
 	}
 
-	errImage := database.Delete("User_Image", map[string]interface{}{"user_id": id})
-	if errImage != nil {
-		utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to delete image data")
-		return errImage
-	}
+	var user models.User
+	db.Find(&user, "username = ?", username)
 
-	return utils.RespondWithSuccess(c, fiber.StatusNoContent, "User deleted successfully")
+	return user, nil
+
 }

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v4"
-	"log"
 	"strings"
 	"time"
 )
@@ -89,7 +88,7 @@ func GenerateToken(user models.User) (json.AuthJson, error) {
 	claims := token.Claims.(jwt.MapClaims)
 	claims["user_id"] = user.UserId
 	claims["username"] = user.Username
-	claims["exp"] = time.Now().Add(time.Second * 5000).Unix()
+	claims["exp"] = time.Now().Add(time.Hour * 3).Unix()
 
 	tokenString, err := token.SignedString(secretKey)
 	if err != nil {
@@ -97,7 +96,8 @@ func GenerateToken(user models.User) (json.AuthJson, error) {
 	}
 
 	var auth = json.AuthJson{
-		User:     user,
+		UserId:   user.UserId,
+		Username: user.Username,
 		Token:    tokenString,
 		TokenExp: claims["exp"].(int64),
 	}
@@ -134,8 +134,7 @@ func CurrentUser(c *fiber.Ctx) (json.AuthTokenJson, error) {
 	}
 	authJson, err := GetCurrentUserFromToken(token)
 	if err != nil {
-		utils.RespondWithError(c, fiber.StatusBadRequest, "Invalid token")
-		return json.AuthTokenJson{}, err
+		return json.AuthTokenJson{}, utils.RespondJson(c, fiber.StatusBadRequest, "Invalid token")
 	}
 
 	return authJson, nil
@@ -153,9 +152,4 @@ func Logout(c *fiber.Ctx) error {
 
 func RevokeToken(token string) {
 	delete(activeTokens, token)
-}
-
-func LogRequests(c *fiber.Ctx) error {
-	log.Println(c.Method(), c.Path())
-	return c.Next()
 }
