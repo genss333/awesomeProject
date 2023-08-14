@@ -134,8 +134,7 @@ func CurrentUser(c *fiber.Ctx) (json.AuthTokenJson, error) {
 	}
 	authJson, err := GetCurrentUserFromToken(token)
 	if err != nil {
-		utils.RespondWithError(c, fiber.StatusBadRequest, "Invalid token")
-		return json.AuthTokenJson{}, err
+		return json.AuthTokenJson{}, utils.RespondJson(c, fiber.StatusBadRequest, "Invalid token")
 	}
 
 	return authJson, nil
