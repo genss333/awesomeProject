@@ -16,7 +16,6 @@ func GetUsers(c *fiber.Ctx) error {
 	}
 
 	var users []models.User
-
 	db.Preload("Books").Preload("UserImages").Find(&users)
 	fmt.Println(users)
 
@@ -29,6 +28,7 @@ func GetUserById(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+
 	var user models.User
 	db.Preload("Books").Preload("UserImages").Find(&user, id)
 
@@ -55,6 +55,36 @@ func CreateUser(c *fiber.Ctx) error {
 	image, err := c.FormFile("image")
 	if err != nil {
 		return err
+	}
+
+	if username == "" {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Username is required")
+	}
+	if userEmail == "" {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Email is required")
+	}
+	if password == "" {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Password is required")
+	}
+	if address == "" {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Address is required")
+	}
+	if tel == "" {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Tel is required")
+	}
+	if pId == "" {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Pid is required")
+	}
+	if image == nil {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Image is required")
+	}
+
+	checkIsUser, err := CheckAlreadyUser(username)
+	if err != nil {
+		return utils.RespondJson(c, fiber.StatusBadRequest, err.Error())
+	}
+	if checkIsUser.Username == username {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "User already exists")
 	}
 
 	tx := db.Begin()
@@ -155,4 +185,17 @@ func DeleteUser(c *fiber.Ctx) error {
 	tx.Commit()
 
 	return utils.RespondJson(c, fiber.StatusNoContent, "User deleted successfully")
+}
+
+func CheckAlreadyUser(username string) (models.User, error) {
+	db, err := database.Connect()
+	if err != nil {
+		return models.User{}, err
+	}
+
+	var user models.User
+	db.Find(&user, "username = ?", username)
+
+	return user, nil
+
 }
