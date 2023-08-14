@@ -1,8 +1,8 @@
 package models
 
 type User struct {
-	UserId     int    `json:"user_id"`
-	Username   string `json:"username"`
-	UserEmail  string `json:"user_email"`
-	UserStatus int    `json:"user_status"`
+	UserId     uint   `gorm:"column:user_id;primaryKey"`
+	Username   string `gorm:"column:username"`
+	UserEmail  string `gorm:"column:user_email"`
+	UserStatus int    `gorm:"column:user_status"`
 }

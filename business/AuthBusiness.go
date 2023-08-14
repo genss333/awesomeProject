@@ -12,53 +12,42 @@ import (
 func Login(c *fiber.Ctx) error {
 	var requestBody payload.AuthPayload
 	if err := c.BodyParser(&requestBody); err != nil {
-		utils.RespondWithError(c, fiber.StatusBadRequest, "Failed to parse request body")
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Failed to parse request body")
 	}
 
 	if requestBody.Username == "" {
-		utils.RespondWithError(c, fiber.StatusBadRequest, "Username is empty")
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Username is empty")
 	}
 
 	if requestBody.UserEmail == "" {
-		utils.RespondWithError(c, fiber.StatusBadRequest, "User email is empty")
+		return utils.RespondJson(c, fiber.StatusBadRequest, "User email is empty")
 	}
 
-	rows, err := database.Select("Users", map[string]interface{}{
-		"username":   requestBody.Username,
-		"user_email": requestBody.UserEmail,
-	})
+	db, err := database.Connect()
 	if err != nil {
-		utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to connect to the database")
-		return err
+		return utils.RespondJson(c, fiber.StatusInternalServerError, string(err.Error()))
 	}
-	if err != nil {
-		utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to fetch users from the database")
-		return err
-	}
-
 	var user models.User
-	for rows.Next() {
-		err := rows.Scan(&user.UserId, &user.Username, &user.UserEmail, &user.UserStatus)
-		if err != nil {
-			utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to read user data")
-			return err
-		}
+	db.Find(&user, "user_email = ? AND username = ?", requestBody.UserEmail, requestBody.Username)
+
+	if err != nil {
+		return utils.RespondJson(c, fiber.StatusInternalServerError, "Failed to connect to the database")
+	}
+	if err != nil {
+		return utils.RespondJson(c, fiber.StatusInternalServerError, "Failed to fetch users from the database")
 	}
 
 	if user.UserId == 0 {
-		utils.RespondWithError(c, fiber.StatusBadRequest, "User not found")
-		return err
+		return utils.RespondJson(c, fiber.StatusBadRequest, "User not found")
 	}
 
 	if user.UserStatus == 0 {
-		utils.RespondWithError(c, fiber.StatusUnauthorized, "User is not active")
-		return err
+		return utils.RespondJson(c, fiber.StatusUnauthorized, "User is not active")
 	}
 
 	token, err := service.GenerateToken(user)
 	if err != nil {
-		utils.RespondWithError(c, fiber.StatusInternalServerError, "Failed to generate token")
-		return err
+		return utils.RespondJson(c, fiber.StatusInternalServerError, "Failed to generate token")
 	}
 
 	return c.JSON(token)
@@ -70,6 +59,6 @@ func Logout(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return utils.RespondWithSuccess(c, fiber.StatusOK, "Logout success")
+	return utils.RespondJson(c, fiber.StatusOK, "Logout success")
 
 }
