@@ -1,6 +1,7 @@
 package database
 
 import (
+	"awesomeProject/models"
 	"awesomeProject/utils"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
@@ -25,14 +26,19 @@ func Connect() (*gorm.DB, error) {
 	return db, nil
 }
 
-func CreateTables(model []interface{}) {
+func CreateTables() {
 	db, err := Connect()
 	if err != nil {
 		panic("failed to connect database")
 	}
 
-	err = db.AutoMigrate(model...)
+	err = db.AutoMigrate(TableList()...)
 	if err != nil {
 		return
 	}
+}
+
+func TableList() []interface{} {
+	model := []interface{}{&models.User{}, &models.Book{}, &models.UserImage{}}
+	return model
 }

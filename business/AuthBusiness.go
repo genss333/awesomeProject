@@ -19,8 +19,8 @@ func Login(c *fiber.Ctx) error {
 		return utils.RespondJson(c, fiber.StatusBadRequest, "Username is empty")
 	}
 
-	if requestBody.UserEmail == "" {
-		return utils.RespondJson(c, fiber.StatusBadRequest, "User email is empty")
+	if requestBody.Password == "" {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Password email is empty")
 	}
 
 	db, err := database.Connect()
@@ -28,7 +28,11 @@ func Login(c *fiber.Ctx) error {
 		return utils.RespondJson(c, fiber.StatusInternalServerError, string(err.Error()))
 	}
 	var user models.User
-	db.Find(&user, "user_email = ? AND username = ?", requestBody.UserEmail, requestBody.Username)
+	db.Find(&user, "username = ?", requestBody.Username)
+
+	if user.Password != utils.EnSha256Hash(requestBody.Password) {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Password is incorrect")
+	}
 
 	if err != nil {
 		return utils.RespondJson(c, fiber.StatusInternalServerError, "Failed to connect to the database")

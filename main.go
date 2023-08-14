@@ -3,8 +3,8 @@ package main
 import (
 	"awesomeProject/controller"
 	"awesomeProject/database"
-	"awesomeProject/models"
 	"awesomeProject/service"
+	"awesomeProject/utils"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
 	"log"
@@ -14,10 +14,10 @@ func main() {
 
 	// Fiber instance
 	app := fiber.New()
-	app.Use(service.LogRequests)
+	app.Use(utils.LogRequests)
 
 	//Migrate database
-	database.CreateTables([]interface{}{&models.User{}, &models.Book{}, &models.UserImage{}})
+	database.CreateTables()
 
 	// Auth controller routes
 	controller.AuthInitializeRoutes(app)

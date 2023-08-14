@@ -7,7 +7,6 @@ import (
 	"errors"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v4"
-	"log"
 	"strings"
 	"time"
 )
@@ -97,7 +96,8 @@ func GenerateToken(user models.User) (json.AuthJson, error) {
 	}
 
 	var auth = json.AuthJson{
-		User:     user,
+		UserId:   user.UserId,
+		Username: user.Username,
 		Token:    tokenString,
 		TokenExp: claims["exp"].(int64),
 	}
@@ -152,9 +152,4 @@ func Logout(c *fiber.Ctx) error {
 
 func RevokeToken(token string) {
 	delete(activeTokens, token)
-}
-
-func LogRequests(c *fiber.Ctx) error {
-	log.Println(c.Method(), c.Path())
-	return c.Next()
 }
