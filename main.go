@@ -3,7 +3,7 @@ package main
 import (
 	"awesomeProject/controller"
 	"awesomeProject/database"
-	"awesomeProject/service"
+	"awesomeProject/middleware"
 	"awesomeProject/utils"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
@@ -23,7 +23,7 @@ func main() {
 	controller.AuthInitializeRoutes(app)
 
 	// Middleware to protect routes with JWT
-	app.Use(service.JWTMiddleware)
+	app.Use(middleware.JWTMiddleware)
 
 	// User controller routes
 	controller.UserInitializeRoutes(app)

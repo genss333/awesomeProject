@@ -14,97 +14,93 @@ import (
 var secretKey = []byte(utils.GoDotEnvVariable("JWT_SECRET_KEY"))
 
 var activeTokens = make(map[string]int64)
+var refreshTokens = make(map[string]int64)
 
-func JWTMiddleware(c *fiber.Ctx) error {
-	authorizationHeader := c.Get("Authorization")
-	if authorizationHeader == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"message": "Missing authorization header",
-			"status":  fiber.StatusUnauthorized,
-			"path":    c.Path(),
-		})
-	}
-
-	if !strings.HasPrefix(authorizationHeader, "Bearer ") {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"message": "Invalid token format",
-			"status":  fiber.StatusUnauthorized,
-			"path":    c.Path(),
-		})
-	}
-
-	tokenString := strings.TrimPrefix(authorizationHeader, "Bearer ")
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		return secretKey, nil
-	})
-
-	if err != nil {
-		if errors.Is(err, jwt.ErrSignatureInvalid) {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"message": "Invalid token signature",
-				"status":  fiber.StatusUnauthorized,
-				"path":    c.Path(),
-			})
-		}
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"message": "Invalid token",
-			"status":  fiber.StatusUnauthorized,
-			"path":    c.Path(),
-		})
-	}
-
-	if token.Valid {
-		tokenExp := int64(token.Claims.(jwt.MapClaims)["exp"].(float64))
-
-		if _, exists := activeTokens[tokenString]; !exists {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"message": "Token is no longer active",
-				"status":  fiber.StatusUnauthorized,
-				"path":    c.Path(),
-			})
-		}
-
-		currentTime := time.Now().Unix()
-		if currentTime > tokenExp {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"message": "Token has expired",
-				"status":  fiber.StatusUnauthorized,
-				"path":    c.Path(),
-			})
-		}
-
-		return c.Next()
-	}
-
-	return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-		"message": "Invalid token",
-		"status":  fiber.StatusUnauthorized,
-		"path":    c.Path(),
-	})
+func GetActiveTokens() map[string]int64 {
+	return activeTokens
 }
 
 func GenerateToken(user models.User) (json.AuthJson, error) {
-	token := jwt.New(jwt.SigningMethodHS256)
-	claims := token.Claims.(jwt.MapClaims)
-	claims["user_id"] = user.UserId
-	claims["username"] = user.Username
-	claims["exp"] = time.Now().Add(time.Hour * 3).Unix()
+	accessToken := jwt.New(jwt.SigningMethodHS256)
+	accessClaims := accessToken.Claims.(jwt.MapClaims)
+	accessClaims["user_id"] = user.UserId
+	accessClaims["username"] = user.Username
+	accessClaims["exp"] = time.Now().Add(time.Minute * 15).Unix()
 
-	tokenString, err := token.SignedString(secretKey)
+	accessTokenString, err := accessToken.SignedString(secretKey)
+	if err != nil {
+		return json.AuthJson{}, err
+	}
+
+	refreshToken := jwt.New(jwt.SigningMethodHS256)
+	refreshClaims := refreshToken.Claims.(jwt.MapClaims)
+	refreshClaims["user_id"] = user.UserId
+	refreshClaims["username"] = user.Username
+	refreshClaims["exp"] = time.Now().Add(time.Minute * 20).Unix()
+
+	refreshTokenString, err := refreshToken.SignedString(secretKey)
 	if err != nil {
 		return json.AuthJson{}, err
 	}
 
 	var auth = json.AuthJson{
-		UserId:   user.UserId,
-		Username: user.Username,
-		Token:    tokenString,
-		TokenExp: claims["exp"].(int64),
+		UserId:       user.UserId,
+		Username:     user.Username,
+		Token:        accessTokenString,
+		RefreshToken: refreshTokenString,
+		TokenExp:     accessClaims["exp"].(int64),
 	}
 
-	activeTokens[tokenString] = auth.TokenExp
+	activeTokens[accessTokenString] = auth.TokenExp
+	refreshTokens[refreshTokenString] = refreshClaims["exp"].(int64)
 
 	return auth, nil
+}
+
+func RefreshToken(c *fiber.Ctx) error {
+	refreshToken := c.Get("Authorization")
+	if strings.HasPrefix(refreshToken, "Bearer ") {
+		refreshToken = strings.TrimPrefix(refreshToken, "Bearer ")
+	}
+
+	authToken, err := GetCurrentUserFromToken(refreshToken)
+	if err != nil {
+		return utils.RespondJson(c, fiber.StatusBadRequest, string(err.Error()))
+	}
+
+	if _, exists := refreshTokens[refreshToken]; !exists {
+		return utils.RespondJson(c, fiber.StatusBadRequest, "Refresh token is not active")
+	}
+
+	refreshTokenExp := GetTokenExpiration(refreshToken)
+	currentTime := time.Now().Unix()
+	if refreshTokenExp-currentTime <= 900 {
+		user := models.User{
+			UserId:   authToken.UserId,
+			Username: authToken.Username,
+		}
+		newAccessToken, err := GenerateToken(user)
+		if err != nil {
+			return utils.RespondJson(c, fiber.StatusBadRequest, "Error while generating new access token")
+		}
+
+		RevokeToken(refreshToken)
+		activeTokens[newAccessToken.Token] = newAccessToken.TokenExp
+		refreshTokens[newAccessToken.RefreshToken] = time.Now().Add(time.Minute * 30).Unix()
+
+		return c.JSON(fiber.Map{
+			"message":       "Access token refreshed successfully",
+			"status":        fiber.StatusOK,
+			"access_token":  newAccessToken.Token,
+			"refresh_token": newAccessToken.RefreshToken,
+			"token_exp":     newAccessToken.TokenExp,
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Refresh token is still valid",
+		"status":  fiber.StatusOK,
+	})
 }
 
 func GetCurrentUserFromToken(tokenString string) (json.AuthTokenJson, error) {
@@ -116,15 +112,42 @@ func GetCurrentUserFromToken(tokenString string) (json.AuthTokenJson, error) {
 		return json.AuthTokenJson{}, err
 	}
 
-	claims := token.Claims.(jwt.MapClaims)
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return json.AuthTokenJson{}, errors.New("invalid claims format")
+	}
 
 	var authJson = json.AuthTokenJson{
-		UserId:   int(claims["user_id"].(float64)),
-		Username: claims["username"].(string),
-		TokenExp: int64(claims["exp"].(float64)), // Convert to int64
+		UserId:   0, // Default value in case of error or missing value
+		Username: "",
+	}
+
+	if userId, ok := claims["user_id"].(float64); ok {
+		authJson.UserId = int(userId)
+	} else {
+		return json.AuthTokenJson{}, errors.New("invalid user_id claim format")
+	}
+
+	if username, ok := claims["username"].(string); ok {
+		authJson.Username = username
+	} else {
+		return json.AuthTokenJson{}, errors.New("invalid username claim format")
+	}
+
+	if exp, ok := claims["exp"].(float64); ok {
+		authJson.TokenExp = int64(exp)
+	} else {
+		return json.AuthTokenJson{}, errors.New("invalid expiration claim format")
 	}
 
 	return authJson, nil
+}
+
+func GetTokenExpiration(tokenString string) int64 {
+	token, _ := jwt.Parse(tokenString, nil)
+	claims := token.Claims.(jwt.MapClaims)
+	exp := int64(claims["exp"].(float64))
+	return exp
 }
 
 func CurrentUser(c *fiber.Ctx) (json.AuthTokenJson, error) {
