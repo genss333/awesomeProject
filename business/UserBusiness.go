@@ -2,6 +2,7 @@ package business
 
 import (
 	"awesomeProject/database"
+	userexception "awesomeProject/exception"
 	"awesomeProject/models"
 	"awesomeProject/service"
 	"awesomeProject/utils"
@@ -58,33 +59,33 @@ func CreateUser(c *fiber.Ctx) error {
 	}
 
 	if username == "" {
-		return utils.RespondJson(c, fiber.StatusBadRequest, "Username is required")
+		return userexception.EmptyUsername(c)
 	}
 	if userEmail == "" {
-		return utils.RespondJson(c, fiber.StatusBadRequest, "Email is required")
+		return userexception.EmptyEmail(c)
 	}
 	if password == "" {
-		return utils.RespondJson(c, fiber.StatusBadRequest, "Password is required")
+		return userexception.EmptyPassword(c)
 	}
 	if address == "" {
-		return utils.RespondJson(c, fiber.StatusBadRequest, "Address is required")
+		return userexception.EmptyAddress(c)
 	}
 	if tel == "" {
-		return utils.RespondJson(c, fiber.StatusBadRequest, "Tel is required")
+		return userexception.EmptyTel(c)
 	}
 	if pId == "" {
-		return utils.RespondJson(c, fiber.StatusBadRequest, "Pid is required")
+		return userexception.EmptyPid(c)
 	}
 	if image == nil {
-		return utils.RespondJson(c, fiber.StatusBadRequest, "Image is required")
+		return userexception.EmptyImage(c)
 	}
 
 	checkIsUser, err := CheckAlreadyUser(username)
 	if err != nil {
-		return utils.RespondJson(c, fiber.StatusBadRequest, err.Error())
+		return err
 	}
 	if checkIsUser.Username == username {
-		return utils.RespondJson(c, fiber.StatusBadRequest, "User already exists")
+		return userexception.AlreadyUser(c)
 	}
 
 	tx := db.Begin()
@@ -145,16 +146,16 @@ func UpdateUser(c *fiber.Ctx) error {
 	}
 
 	if address == "" {
-		return utils.RespondJson(c, fiber.StatusBadRequest, "Address is required")
+		return userexception.EmptyAddress(c)
 	}
 	if tel == "" {
-		return utils.RespondJson(c, fiber.StatusBadRequest, "Tel is required")
+		return userexception.EmptyTel(c)
 	}
 	if pId == "" {
-		return utils.RespondJson(c, fiber.StatusBadRequest, "Pid is required")
+		return userexception.EmptyPid(c)
 	}
 	if image == nil {
-		return utils.RespondJson(c, fiber.StatusBadRequest, "Image is required")
+		return userexception.EmptyImage(c)
 	}
 
 	tx := db.Begin()
@@ -194,9 +195,8 @@ func DeleteUser(c *fiber.Ctx) error {
 	tx := db.Begin()
 
 	tx.Find(&models.User{}, "user_id = ?", id)
-	fmt.Println(tx.RowsAffected)
 	if tx.RowsAffected == 0 {
-		return utils.RespondJson(c, fiber.StatusBadRequest, "User not found")
+		return userexception.NotFoundUser(c)
 	}
 	tx.Delete(&models.User{}, id)
 
