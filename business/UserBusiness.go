@@ -6,25 +6,41 @@ import (
 	"awesomeProject/models"
 	"awesomeProject/service"
 	"awesomeProject/utils"
-	"fmt"
 	"github.com/gofiber/fiber/v2"
+	"strconv"
 )
 
 func GetUsers(c *fiber.Ctx) error {
+
 	db, err := database.Connect()
 	if err != nil {
 		return err
 	}
 
+	offset, err := strconv.Atoi(c.Params("offset"))
+	if err != nil {
+		return utils.RespondJson(c, fiber.StatusBadRequest, string(err.Error()))
+	}
+
+	limit, err := strconv.Atoi(c.Params("limit"))
+	if err != nil {
+		return utils.RespondJson(c, fiber.StatusBadRequest, string(err.Error()))
+	}
+
 	var users []models.User
-	db.Preload("Books").Preload("UserImages").Find(&users)
-	fmt.Println(users)
+	err = db.Preload("Books").Preload("UserImages").Offset(offset).Limit(limit).Find(&users).Error
+	if err != nil {
+		return err
+	}
 
 	return c.JSON(users)
 }
 
 func GetUserById(c *fiber.Ctx) error {
-	id := c.Params("id")
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return utils.RespondJson(c, fiber.StatusBadRequest, string(err.Error()))
+	}
 	db, err := database.Connect()
 	if err != nil {
 		return err

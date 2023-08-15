@@ -6,7 +6,7 @@ import (
 )
 
 func UserInitializeRoutes(app *fiber.App) {
-	app.Get("/api/user/", getUsersHandler)
+	app.Get("/api/user/:offset/:limit", getUsersHandler)
 	app.Get("/api/user/:id", getUserByIdHandler)
 	app.Post("/api/user/", createUserHandler)
 	app.Patch("/api/user/update", updateUserHandler)
