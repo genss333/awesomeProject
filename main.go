@@ -4,6 +4,7 @@ import (
 	"awesomeProject/controller"
 	"awesomeProject/database"
 	"awesomeProject/middleware"
+	"awesomeProject/security"
 	"awesomeProject/utils"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
@@ -15,6 +16,7 @@ func main() {
 	// Fiber instance
 	app := fiber.New()
 	app.Use(utils.LogRequests)
+	app.Use(middleware.CorsMiddleware())
 
 	//Migrate database
 	database.CreateTables()
@@ -22,11 +24,8 @@ func main() {
 	// Auth controller routes
 	controller.AuthInitializeRoutes(app)
 
-	// Middleware to protect routes with JWT
-	app.Use(middleware.JWTMiddleware)
-
-	// User controller routes
-	controller.UserInitializeRoutes(app)
+	// Security configuration
+	security.ApplySecurityConfiguration(app)
 
 	fmt.Println("Server listening on :8080")
 	log.Fatal(app.Listen(":8080"))
