@@ -36,7 +36,7 @@ func GenerateToken(user models.User) (json.AuthJson, error) {
 	refreshClaims := refreshToken.Claims.(jwt.MapClaims)
 	refreshClaims["user_id"] = user.UserId
 	refreshClaims["username"] = user.Username
-	refreshClaims["exp"] = time.Now().Add(time.Minute * 30).Unix()
+	refreshClaims["exp"] = time.Now().Add(time.Minute * 20).Unix()
 
 	refreshTokenString, err := refreshToken.SignedString(secretKey)
 	if err != nil {
@@ -86,12 +86,14 @@ func RefreshToken(c *fiber.Ctx) error {
 
 		RevokeToken(refreshToken)
 		activeTokens[newAccessToken.Token] = newAccessToken.TokenExp
+		refreshTokens[newAccessToken.RefreshToken] = time.Now().Add(time.Minute * 30).Unix()
 
 		return c.JSON(fiber.Map{
-			"message":      "Access token refreshed successfully",
-			"status":       fiber.StatusOK,
-			"access_token": newAccessToken.Token,
-			"token_exp":    newAccessToken.TokenExp,
+			"message":       "Access token refreshed successfully",
+			"status":        fiber.StatusOK,
+			"access_token":  newAccessToken.Token,
+			"refresh_token": newAccessToken.RefreshToken,
+			"token_exp":     newAccessToken.TokenExp,
 		})
 	}
 
