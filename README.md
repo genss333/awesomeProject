@@ -55,5 +55,5 @@ Welcome to **Awesome Project**, a Go API built using the Fiber framework and GOR
 
 Contributions are welcome! If you find any issues or have suggestions, feel free to create a pull request or submit an issue.
 
-Feel free to customize this README to fit your project's specific details. Make sure to replace placeholders like `your-username` and `awesome-project` with the appropriate values. Happy coding on your "Awesome Project"!
+Feel free to customize this README to fit your project's specific details. Make sure to replace placeholders like `genss333` and `awesome-project` with the appropriate values. Happy coding on your "Awesome Project"!
 
