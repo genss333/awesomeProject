@@ -13,7 +13,7 @@ import (
 var activeTokens = service.GetActiveTokens()
 var secretKey = []byte(utils.GoDotEnvVariable("JWT_SECRET_KEY"))
 
-func JWTMiddleware(c *fiber.Ctx) error {
+func AuthenticationMiddleware(c *fiber.Ctx) error {
 	authorizationHeader := c.Get("Authorization")
 	if authorizationHeader == "" {
 		return utils.RespondJson(c, fiber.StatusUnauthorized, "Middleware Missing token")
@@ -51,4 +51,23 @@ func JWTMiddleware(c *fiber.Ctx) error {
 	}
 
 	return utils.RespondJson(c, fiber.StatusUnauthorized, "Middleware Invalid token")
+}
+
+func AuthorizationMiddleware(allowedRoles []string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		tokenString := c.Get("Authorization")
+		token, _ := jwt.Parse(tokenString, nil)
+		claims, _ := token.Claims.(jwt.MapClaims)
+		roles, _ := claims["roles"].([]interface{})
+
+		for _, allowedRole := range allowedRoles {
+			for _, userRole := range roles {
+				if allowedRole == userRole {
+					return c.Next()
+				}
+			}
+		}
+
+		return utils.RespondJson(c, fiber.StatusUnauthorized, "Unauthorized")
+	}
 }

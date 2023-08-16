@@ -26,7 +26,7 @@ func Connect() (*gorm.DB, error) {
 	return db, nil
 }
 
-func CreateTables() {
+func MigrationTable() {
 	db, err := Connect()
 	if err != nil {
 		panic("failed to connect database")

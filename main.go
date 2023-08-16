@@ -19,7 +19,7 @@ func main() {
 	app.Use(middleware.CorsMiddleware())
 
 	//Migrate database
-	database.CreateTables()
+	database.MigrationTable()
 
 	// Auth controller routes
 	controller.AuthInitializeRoutes(app)

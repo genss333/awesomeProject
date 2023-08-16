@@ -8,7 +8,7 @@ import (
 
 func ApplySecurityConfiguration(app *fiber.App) {
 	// Middleware to protect routes with JWT
-	app.Use(middleware.JWTMiddleware)
+	app.Use(middleware.AuthenticationMiddleware)
 
 	// User controller routes
 	controller.UserInitializeRoutes(app)

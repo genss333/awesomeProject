@@ -6,6 +6,7 @@ type User struct {
 	Password   string    `gorm:"column:password" json:"password"`
 	UserEmail  string    `gorm:"column:user_email" json:"user_email"`
 	UserStatus int       `gorm:"column:user_status;default:1" json:"user_status"`
+	Role       string    `gorm:"column:role;default:user" json:"role"`
 	Books      Book      `gorm:"foreignKey:UserID" json:"books"`
 	UserImages UserImage `gorm:"foreignKey:UserID" json:"user_images"`
 }
