@@ -56,18 +56,35 @@ func AuthenticationMiddleware(c *fiber.Ctx) error {
 func AuthorizationMiddleware(allowedRoles []string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		tokenString := c.Get("Authorization")
-		token, _ := jwt.Parse(tokenString, nil)
-		claims, _ := token.Claims.(jwt.MapClaims)
-		roles, _ := claims["roles"].([]interface{})
+		if tokenString == "" {
+			return utils.RespondJson(c, fiber.StatusUnauthorized, "Missing Authorization header")
+		}
+
+		tokenString = strings.TrimPrefix(tokenString, "Bearer ")
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			return secretKey, nil
+		})
+
+		if err != nil || !token.Valid {
+			return utils.RespondJson(c, fiber.StatusUnauthorized, "Invalid token")
+		}
+
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			return utils.RespondJson(c, fiber.StatusUnauthorized, "Invalid token claims")
+		}
+
+		rolesInterface, exists := claims["roles"]
+		if !exists {
+			return utils.RespondJson(c, fiber.StatusForbidden, "Access denied")
+		}
 
 		for _, allowedRole := range allowedRoles {
-			for _, userRole := range roles {
-				if allowedRole == userRole {
-					return c.Next()
-				}
+			if rolesInterface == allowedRole {
+				return c.Next()
 			}
 		}
 
-		return utils.RespondJson(c, fiber.StatusUnauthorized, "Unauthorized")
+		return utils.RespondJson(c, fiber.StatusForbidden, "Access denied")
 	}
 }
