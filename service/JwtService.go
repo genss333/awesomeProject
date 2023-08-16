@@ -25,6 +25,7 @@ func GenerateToken(user models.User) (json.AuthJson, error) {
 	accessClaims := accessToken.Claims.(jwt.MapClaims)
 	accessClaims["user_id"] = user.UserId
 	accessClaims["username"] = user.Username
+	accessClaims["roles"] = user.Role
 	accessClaims["exp"] = time.Now().Add(time.Minute * 15).Unix()
 
 	accessTokenString, err := accessToken.SignedString(secretKey)
@@ -36,6 +37,7 @@ func GenerateToken(user models.User) (json.AuthJson, error) {
 	refreshClaims := refreshToken.Claims.(jwt.MapClaims)
 	refreshClaims["user_id"] = user.UserId
 	refreshClaims["username"] = user.Username
+	refreshClaims["roles"] = user.Role
 	refreshClaims["exp"] = time.Now().Add(time.Minute * 20).Unix()
 
 	refreshTokenString, err := refreshToken.SignedString(secretKey)
@@ -88,19 +90,18 @@ func RefreshToken(c *fiber.Ctx) error {
 		activeTokens[newAccessToken.Token] = newAccessToken.TokenExp
 		refreshTokens[newAccessToken.RefreshToken] = time.Now().Add(time.Minute * 30).Unix()
 
-		return c.JSON(fiber.Map{
-			"message":       "Access token refreshed successfully",
-			"status":        fiber.StatusOK,
-			"access_token":  newAccessToken.Token,
-			"refresh_token": newAccessToken.RefreshToken,
-			"token_exp":     newAccessToken.TokenExp,
-		})
+		var auth = json.AuthJson{
+			UserId:       user.UserId,
+			Username:     user.Username,
+			Token:        newAccessToken.Token,
+			RefreshToken: newAccessToken.RefreshToken,
+			TokenExp:     newAccessToken.TokenExp,
+		}
+
+		return c.JSON(auth)
 	}
 
-	return c.JSON(fiber.Map{
-		"message": "Refresh token is still valid",
-		"status":  fiber.StatusOK,
-	})
+	return utils.RespondJson(c, fiber.StatusOK, "Token is Still Active")
 }
 
 func GetCurrentUserFromToken(tokenString string) (json.AuthTokenJson, error) {
