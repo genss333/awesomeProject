@@ -1,19 +1,19 @@
-package controller
+package auth
 
 import (
-	"awesomeProject/business"
+	"awesomeProject/business/auth"
 	fiber "github.com/gofiber/fiber/v2"
 )
 
-func AuthInitializeRoutes(app *fiber.App) {
+func InitializeRoutes(app *fiber.App) {
 	app.Post("/api/login", loginHandler)
 	app.Post("/api/register", RegisterHandler)
 }
 
 func loginHandler(c *fiber.Ctx) error {
-	return business.Login(c)
+	return auth.Login(c)
 }
 
 func RegisterHandler(c *fiber.Ctx) error {
-	return business.CreateUser(c)
+	return auth.Register(c)
 }

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"awesomeProject/controller"
+	"awesomeProject/controller/auth"
 	"awesomeProject/database"
 	"awesomeProject/middleware"
 	"awesomeProject/security"
@@ -22,7 +22,7 @@ func main() {
 	database.MigrationTable()
 
 	// Auth controller routes
-	controller.AuthInitializeRoutes(app)
+	auth.InitializeRoutes(app)
 
 	// Security configuration
 	security.ApplySecurityConfiguration(app)

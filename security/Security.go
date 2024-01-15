@@ -1,7 +1,7 @@
 package security
 
 import (
-	"awesomeProject/controller"
+	"awesomeProject/controller/user"
 	"awesomeProject/middleware"
 	"github.com/gofiber/fiber/v2"
 )
@@ -11,5 +11,5 @@ func ApplySecurityConfiguration(app *fiber.App) {
 	app.Use(middleware.AuthenticationMiddleware)
 
 	// User controller routes
-	controller.UserInitializeRoutes(app)
+	user.InitializeRoutes(app)
 }

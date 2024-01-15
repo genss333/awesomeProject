@@ -1,4 +1,4 @@
-package payload
+package auth
 
 type AuthPayload struct {
 	Username string `json:"username"`

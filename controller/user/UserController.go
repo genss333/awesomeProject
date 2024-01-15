@@ -1,13 +1,14 @@
-package controller
+package user
 
 import (
-	"awesomeProject/business"
+	"awesomeProject/business/auth"
+	"awesomeProject/business/user"
 	"awesomeProject/middleware"
 	"awesomeProject/service"
 	"github.com/gofiber/fiber/v2"
 )
 
-func UserInitializeRoutes(app *fiber.App) {
+func InitializeRoutes(app *fiber.App) {
 	app.Get("/api/user/:offset/:limit", middleware.AuthorizationMiddleware([]string{"user", "admin"}), getUsersHandler)
 	app.Get("/api/user/:id", middleware.AuthorizationMiddleware([]string{"user", "admin"}), getUserByIdHandler)
 	app.Post("/api/user/", middleware.AuthorizationMiddleware([]string{"user", "admin"}), createUserHandler)
@@ -18,27 +19,27 @@ func UserInitializeRoutes(app *fiber.App) {
 }
 
 func getUsersHandler(c *fiber.Ctx) error {
-	return business.GetUsers(c)
+	return user.GetUsers(c)
 }
 
 func getUserByIdHandler(c *fiber.Ctx) error {
-	return business.GetUserById(c)
+	return user.GetUserById(c)
 }
 
 func createUserHandler(c *fiber.Ctx) error {
-	return business.CreateUser(c)
+	return user.CreateUser(c)
 }
 
 func updateUserHandler(c *fiber.Ctx) error {
-	return business.UpdateUser(c)
+	return user.UpdateUser(c)
 }
 
 func deleteUserHandler(c *fiber.Ctx) error {
-	return business.DeleteUser(c)
+	return user.DeleteUser(c)
 }
 
 func logoutHandler(c *fiber.Ctx) error {
-	return business.Logout(c)
+	return auth.Logout(c)
 }
 
 func RefreshTokenHandler(c *fiber.Ctx) error {

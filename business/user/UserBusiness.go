@@ -1,4 +1,4 @@
-package business
+package user
 
 import (
 	"awesomeProject/database"

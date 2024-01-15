@@ -1,4 +1,4 @@
-package json
+package auth
 
 type AuthJson struct {
 	UserId       int    `json:"user_id"`

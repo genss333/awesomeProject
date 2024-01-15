@@ -1,7 +1,7 @@
 package service
 
 import (
-	"awesomeProject/json"
+	"awesomeProject/json/auth"
 	"awesomeProject/models"
 	"awesomeProject/utils"
 	"errors"
@@ -20,7 +20,7 @@ func GetActiveTokens() map[string]int64 {
 	return activeTokens
 }
 
-func GenerateToken(user models.User) (json.AuthJson, error) {
+func GenerateToken(user models.User) (auth.AuthJson, error) {
 	accessToken := jwt.New(jwt.SigningMethodHS256)
 	accessClaims := accessToken.Claims.(jwt.MapClaims)
 	accessClaims["user_id"] = user.UserId
@@ -30,7 +30,7 @@ func GenerateToken(user models.User) (json.AuthJson, error) {
 
 	accessTokenString, err := accessToken.SignedString(secretKey)
 	if err != nil {
-		return json.AuthJson{}, err
+		return auth.AuthJson{}, err
 	}
 
 	refreshToken := jwt.New(jwt.SigningMethodHS256)
@@ -42,10 +42,10 @@ func GenerateToken(user models.User) (json.AuthJson, error) {
 
 	refreshTokenString, err := refreshToken.SignedString(secretKey)
 	if err != nil {
-		return json.AuthJson{}, err
+		return auth.AuthJson{}, err
 	}
 
-	var auth = json.AuthJson{
+	var auth = auth.AuthJson{
 		UserId:       user.UserId,
 		Username:     user.Username,
 		Token:        accessTokenString,
@@ -90,7 +90,7 @@ func RefreshToken(c *fiber.Ctx) error {
 		activeTokens[newAccessToken.Token] = newAccessToken.TokenExp
 		refreshTokens[newAccessToken.RefreshToken] = time.Now().Add(time.Minute * 30).Unix()
 
-		var auth = json.AuthJson{
+		var auth = auth.AuthJson{
 			UserId:       user.UserId,
 			Username:     user.Username,
 			Token:        newAccessToken.Token,
@@ -104,21 +104,21 @@ func RefreshToken(c *fiber.Ctx) error {
 	return utils.RespondJson(c, fiber.StatusOK, "Token is Still Active")
 }
 
-func GetCurrentUserFromToken(tokenString string) (json.AuthTokenJson, error) {
+func GetCurrentUserFromToken(tokenString string) (auth.AuthTokenJson, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		return secretKey, nil
 	})
 
 	if err != nil || !token.Valid {
-		return json.AuthTokenJson{}, err
+		return auth.AuthTokenJson{}, err
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return json.AuthTokenJson{}, errors.New("invalid claims format")
+		return auth.AuthTokenJson{}, errors.New("invalid claims format")
 	}
 
-	var authJson = json.AuthTokenJson{
+	var authJson = auth.AuthTokenJson{
 		UserId:   0, // Default value in case of error or missing value
 		Username: "",
 	}
@@ -126,19 +126,19 @@ func GetCurrentUserFromToken(tokenString string) (json.AuthTokenJson, error) {
 	if userId, ok := claims["user_id"].(float64); ok {
 		authJson.UserId = int(userId)
 	} else {
-		return json.AuthTokenJson{}, errors.New("invalid user_id claim format")
+		return auth.AuthTokenJson{}, errors.New("invalid user_id claim format")
 	}
 
 	if username, ok := claims["username"].(string); ok {
 		authJson.Username = username
 	} else {
-		return json.AuthTokenJson{}, errors.New("invalid username claim format")
+		return auth.AuthTokenJson{}, errors.New("invalid username claim format")
 	}
 
 	if exp, ok := claims["exp"].(float64); ok {
 		authJson.TokenExp = int64(exp)
 	} else {
-		return json.AuthTokenJson{}, errors.New("invalid expiration claim format")
+		return auth.AuthTokenJson{}, errors.New("invalid expiration claim format")
 	}
 
 	return authJson, nil
@@ -151,14 +151,14 @@ func GetTokenExpiration(tokenString string) int64 {
 	return exp
 }
 
-func CurrentUser(c *fiber.Ctx) (json.AuthTokenJson, error) {
+func CurrentUser(c *fiber.Ctx) (auth.AuthTokenJson, error) {
 	var token = c.Get("Authorization")
 	if strings.HasPrefix(token, "Bearer ") {
 		token = strings.TrimPrefix(token, "Bearer ")
 	}
 	authJson, err := GetCurrentUserFromToken(token)
 	if err != nil {
-		return json.AuthTokenJson{}, utils.RespondJson(c, fiber.StatusBadRequest, "Invalid token")
+		return auth.AuthTokenJson{}, utils.RespondJson(c, fiber.StatusBadRequest, "Invalid token")
 	}
 
 	return authJson, nil
